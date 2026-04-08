@@ -721,7 +721,7 @@ function InstagramTab() {
   }
 
   const effectiveMetaConfig = savedMetaConfig ?? metaConfig;
-  const hasMetaCredentials = Boolean(effectiveMetaConfig?.meta_app_id && effectiveMetaConfig?.has_app_secret);
+  const hasMetaCredentials = Boolean(effectiveMetaConfig?.meta_app_id);
 
   return (
     <div className="space-y-6">
