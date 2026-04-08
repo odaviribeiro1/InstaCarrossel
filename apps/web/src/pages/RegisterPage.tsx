@@ -18,6 +18,7 @@ import {
   CardFooter,
 } from '@/components/ui/card';
 import { useAuth } from '@/hooks/use-auth';
+import { hasSupabaseCredentials } from '@/lib/supabase';
 
 const registerSchema = z
   .object({
@@ -57,6 +58,22 @@ export function RegisterPage() {
     } finally {
       setIsLoading(false);
     }
+  }
+
+  if (!hasSupabaseCredentials()) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-4" style={{ backgroundColor: '#0A0A0F' }}>
+        <Card className="w-full max-w-sm">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">Plataforma nao configurada</CardTitle>
+            <CardDescription>Configure a conexao com o Supabase antes de criar uma conta.</CardDescription>
+          </CardHeader>
+          <CardContent className="text-center">
+            <Link to="/setup"><Button className="w-full">Configurar Plataforma</Button></Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
