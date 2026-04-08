@@ -690,7 +690,77 @@ function InstagramTab() {
     }
   }
 
-  const { data: connection, isLoading } = useQuery({
+  // Handle OAuth callback — detect ?code= in URL after Facebook redirect
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const state = params.get('state');
+    const error = params.get('error');
+
+    if (!code || !activeWorkspace) return;
+
+    // Clean URL immediately
+    window.history.replaceState({}, '', window.location.pathname);
+
+    if (error) {
+      toast.error(`Erro no OAuth: ${params.get('error_description') || error}`);
+      return;
+    }
+
+    // Validate CSRF state
+    const savedState = sessionStorage.getItem('meta_oauth_state');
+    if (state !== savedState) {
+      toast.error('Erro de seguranca: state invalido. Tente conectar novamente.');
+      return;
+    }
+    sessionStorage.removeItem('meta_oauth_state');
+
+    // Exchange code for token via Edge Function
+    async function exchangeCode() {
+      setIsConnecting(true);
+      try {
+        const client = getSupabaseClient();
+        if (!client) throw new Error('Supabase nao configurado');
+
+        const redirectUri = `${window.location.origin}/settings`;
+
+        const { data, error: fnError } = await client.functions.invoke('meta-oauth', {
+          body: {
+            code,
+            redirect_uri: redirectUri,
+            workspace_id: activeWorkspace!.id,
+          },
+        });
+
+        if (fnError) throw new Error(fnError.message || 'Erro no token exchange');
+
+        const result = data as { success?: boolean; error?: string; pages?: Array<{ page_name: string; ig_user_id: string | null }> };
+
+        if (result?.error) throw new Error(result.error);
+
+        if (result?.pages && result.pages.length > 0) {
+          const connected = result.pages.find((p) => p.ig_user_id);
+          if (connected) {
+            toast.success(`Instagram conectado: ${connected.page_name}`);
+          } else {
+            toast.warning('Conta conectada, mas nenhuma conta Instagram Business foi encontrada nas paginas.');
+          }
+        } else {
+          toast.success('Instagram conectado');
+        }
+
+        void refetchConnection();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Erro ao conectar Instagram');
+      } finally {
+        setIsConnecting(false);
+      }
+    }
+
+    void exchangeCode();
+  }, [activeWorkspace]);
+
+  const { data: connection, isLoading, refetch: refetchConnection } = useQuery({
     queryKey: ['meta-connection', activeWorkspace?.id],
     queryFn: async () => {
       const client = getSupabaseClient();
