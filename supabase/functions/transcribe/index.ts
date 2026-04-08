@@ -20,31 +20,54 @@ function extractYouTubeId(url: string): string | null {
   return null;
 }
 
-function extractReelShortcode(url: string): string | null {
-  const match = url.match(/instagram\.com\/(?:reel|p)\/([a-zA-Z0-9_-]+)/);
-  return match?.[1] || null;
-}
+async function getMetaAccessToken(
+  adminClient: ReturnType<typeof createClient>,
+  workspaceId: string
+): Promise<{ token: string | null; igUserId: string | null }> {
+  const { data: conn } = await adminClient
+    .from('meta_connections')
+    .select('access_token_id, access_token, ig_user_id')
+    .eq('workspace_id', workspaceId)
+    .maybeSingle();
 
-async function fetchReelViaRapidAPI(url: string, rapidApiKey: string): Promise<{ caption: string | null; videoUrl: string | null }> {
-  // Try Instagram Scraper API on RapidAPI
-  const response = await fetch(`https://instagram-scraper-api2.p.rapidapi.com/v1/post_info?code_or_id_or_url=${encodeURIComponent(url)}`, {
-    headers: {
-      'x-rapidapi-key': rapidApiKey,
-      'x-rapidapi-host': 'instagram-scraper-api2.p.rapidapi.com',
-    },
-  });
+  if (!conn) return { token: null, igUserId: null };
 
-  if (!response.ok) {
-    throw new Error(`RapidAPI responded with ${response.status}`);
+  // Try Vault first
+  if (conn.access_token_id) {
+    try {
+      const { data: vaultToken } = await adminClient.rpc('vault_read', {
+        secret_id: conn.access_token_id,
+      });
+      if (vaultToken) return { token: vaultToken, igUserId: conn.ig_user_id };
+    } catch {
+      // Vault not available
+    }
   }
 
-  const data = await response.json();
+  // Fallback to direct column
+  if (conn.access_token) return { token: conn.access_token, igUserId: conn.ig_user_id };
 
-  // Extract caption and video URL from response
-  const caption = data?.data?.caption?.text || null;
-  const videoUrl = data?.data?.video_url || null;
+  return { token: null, igUserId: conn.ig_user_id };
+}
 
-  return { caption, videoUrl };
+async function fetchReelCaption(url: string, accessToken: string): Promise<string | null> {
+  // Use Instagram oEmbed via Graph API
+  try {
+    const oembedResponse = await fetch(
+      `https://graph.facebook.com/v19.0/instagram_oembed?url=${encodeURIComponent(url)}&access_token=${accessToken}`
+    );
+    if (oembedResponse.ok) {
+      const data = await oembedResponse.json();
+      // oEmbed returns HTML with caption embedded — extract title/author_name
+      if (data.title) return data.title;
+      if (data.author_name) return `Post de @${data.author_name}`;
+    }
+  } catch {
+    // oEmbed failed
+  }
+
+  // Fallback: fetch recent media and match by URL shortcode
+  return null;
 }
 
 Deno.serve(async (req: Request) => {
@@ -155,20 +178,20 @@ Deno.serve(async (req: Request) => {
     }
 
     if (urlType === 'reels') {
-      const rapidApiKey = Deno.env.get('RAPIDAPI_KEY');
+      // Try Meta Graph API with stored access token
+      const { token } = await getMetaAccessToken(adminClient, workspace_id || '');
 
-      if (rapidApiKey) {
+      if (token) {
         try {
-          const { caption } = await fetchReelViaRapidAPI(url, rapidApiKey);
-
+          const caption = await fetchReelCaption(url, token);
           if (caption) {
             return new Response(
-              JSON.stringify({ transcript: caption, source: 'instagram_caption' }),
+              JSON.stringify({ transcript: caption, source: 'instagram_graph_api' }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
           }
         } catch (err) {
-          console.error('RapidAPI Instagram error:', err);
+          console.error('Meta Graph API error:', err);
         }
       }
 
@@ -189,7 +212,11 @@ Deno.serve(async (req: Request) => {
       }
 
       return new Response(
-        JSON.stringify({ error: 'Nao foi possivel extrair conteudo do Reel. Tente colar o texto manualmente.' }),
+        JSON.stringify({
+          error: token
+            ? 'Nao foi possivel extrair conteudo do Reel. Tente colar o texto manualmente.'
+            : 'Conecte o Instagram nas configuracoes para extrair conteudo de Reels.',
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

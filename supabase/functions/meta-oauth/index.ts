@@ -194,6 +194,7 @@ Deno.serve(async (req: Request) => {
         workspace_id,
         user_id: user.id,
         access_token_id: tokenId,
+        access_token: tokenId ? null : finalToken, // Direct fallback if Vault unavailable
         ig_user_id: igPage?.ig_user_id || null,
         ig_username: igPage?.ig_username || null,
         fb_page_id: igPage?.page_id || null,
