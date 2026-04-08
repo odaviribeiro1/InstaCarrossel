@@ -12,25 +12,90 @@ import {
   ZoomIn,
   ZoomOut,
   Save,
+  Sparkles,
+  Loader2,
 } from 'lucide-react';
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { useEditorStore, generateElementId } from '@/stores/editor-store';
 import type { EditorElement } from '@/stores/editor-store';
 import { useCarouselSave } from '@/hooks/use-carousel-save';
+import { useWorkspaceStore } from '@/stores/workspace-store';
+import { getSupabaseClient } from '@/lib/supabase';
 
 export function EditorToolbar() {
   const {
     addElement,
+    sendToBack,
     zoom,
     setZoom,
     saveStatus,
   } = useEditorStore();
 
   const { save } = useCarouselSave();
+  const { activeWorkspace } = useWorkspaceStore();
 
   const imageObjectUrlRef = useRef<string | null>(null);
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiGenerating, setAiGenerating] = useState(false);
+
+  async function handleGenerateImage() {
+    if (!aiPrompt.trim()) return;
+    const client = getSupabaseClient();
+    if (!client || !activeWorkspace) {
+      toast.error('Supabase nao configurado');
+      return;
+    }
+
+    setAiGenerating(true);
+    try {
+      const { data, error } = await client.functions.invoke('generate-image', {
+        body: { prompt: aiPrompt, workspace_id: activeWorkspace.id },
+      });
+
+      if (error) throw new Error(error.message || 'Erro ao gerar imagem');
+      const result = data as { image?: string; error?: string };
+      if (result?.error) throw new Error(result.error);
+      if (!result?.image) throw new Error('Nenhuma imagem retornada');
+
+      const elementId = generateElementId();
+      const element: EditorElement = {
+        id: elementId,
+        type: 'Image',
+        name: 'IA Background',
+        visible: true,
+        locked: false,
+        attrs: {
+          x: 0,
+          y: 0,
+          width: 1080,
+          height: 1350,
+          src: result.image,
+          draggable: true,
+        },
+      };
+      addElement(element);
+      sendToBack(elementId);
+
+      toast.success('Imagem gerada com sucesso');
+      setAiDialogOpen(false);
+      setAiPrompt('');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao gerar imagem');
+    } finally {
+      setAiGenerating(false);
+    }
+  }
 
   useEffect(() => {
     return () => {
@@ -142,6 +207,49 @@ export function EditorToolbar() {
         <ImageIcon className="mr-1 h-4 w-4" />
         <span className="text-xs">Imagem</span>
       </Button>
+
+      <Button variant="ghost" size="sm" title="Gerar imagem com IA" onClick={() => setAiDialogOpen(true)}>
+        <Sparkles className="mr-1 h-4 w-4" />
+        <span className="text-xs">Gerar com IA</span>
+      </Button>
+
+      <Dialog open={aiDialogOpen} onOpenChange={setAiDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Gerar Imagem com IA</DialogTitle>
+            <DialogDescription>
+              Descreva a imagem que deseja gerar. A imagem sera criada no formato 4:5 (1080x1350) e aplicada como fundo do slide.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <textarea
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              placeholder="Ex: Background escuro elegante com gradiente azul e roxo, estilo tech, com formas geometricas abstratas e brilhos sutis"
+              rows={4}
+              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+              disabled={aiGenerating}
+            />
+            <Button
+              onClick={handleGenerateImage}
+              disabled={aiGenerating || !aiPrompt.trim()}
+              className="w-full"
+            >
+              {aiGenerating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Gerando...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Gerar Imagem
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Separator orientation="vertical" className="mx-1 h-6" />
 

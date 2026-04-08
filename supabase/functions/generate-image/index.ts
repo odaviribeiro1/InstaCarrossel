@@ -59,27 +59,27 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Get Imagen API key from Vault
+    // Get Imagen API key: Vault first, then direct column
     const { data: aiConfig } = await adminClient
       .from('ai_configs')
-      .select('imagen_api_key_id')
+      .select('imagen_api_key_id, imagen_api_key')
       .eq('workspace_id', workspace_id || '')
       .maybeSingle();
 
-    if (!aiConfig?.imagen_api_key_id) {
-      return new Response(JSON.stringify({ error: 'API Key Gemini Imagen nao configurada' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    let apiKey = '';
+    if (aiConfig?.imagen_api_key_id) {
+      try {
+        const { data: secret } = await adminClient.rpc('vault_read', { secret_id: aiConfig.imagen_api_key_id });
+        apiKey = secret || '';
+      } catch { /* Vault unavailable */ }
+    }
+    if (!apiKey && aiConfig?.imagen_api_key) {
+      apiKey = aiConfig.imagen_api_key;
     }
 
-    const { data: apiKey } = await adminClient.rpc('vault_read', {
-      secret_id: aiConfig.imagen_api_key_id,
-    });
-
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: 'API Key nao encontrada no Vault' }), {
-        status: 500,
+      return new Response(JSON.stringify({ error: 'API Key Gemini Imagen nao configurada. Va em Configuracoes > IA.' }), {
+        status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
