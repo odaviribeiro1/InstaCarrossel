@@ -777,7 +777,7 @@ function InstagramTab() {
       if (!client || !activeWorkspace) return null;
       const { data } = await client
         .from('meta_connections')
-        .select('id, ig_user_id, token_expires_at')
+        .select('id, ig_user_id, ig_username, fb_user_name, token_expires_at')
         .eq('workspace_id', activeWorkspace.id)
         .maybeSingle();
       return data;
@@ -925,9 +925,20 @@ function InstagramTab() {
                     <CheckCircle2 className="mr-2 inline h-4 w-4 text-emerald-400" />
                     Conectado
                   </p>
-                  <p className="mt-1 text-xs text-[#94A3B8]">
-                    IG User ID: {connection.ig_user_id ?? 'N/A'}
-                  </p>
+                  {connection.ig_username ? (
+                    <p className="mt-1 text-sm text-[#F8FAFC]">
+                      @{connection.ig_username}
+                    </p>
+                  ) : connection.fb_user_name ? (
+                    <p className="mt-1 text-xs text-[#94A3B8]">
+                      Facebook: {connection.fb_user_name}
+                      {!connection.ig_user_id && ' (nenhuma conta IG Business vinculada)'}
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-xs text-[#94A3B8]">
+                      {connection.ig_user_id ? `IG ID: ${connection.ig_user_id}` : 'Conta Facebook conectada'}
+                    </p>
+                  )}
                   {connection.token_expires_at && (
                     <p className={`mt-0.5 text-xs ${isExpired ? 'text-red-400' : 'text-[#94A3B8]'}`}>
                       Token {isExpired ? 'expirado em' : 'expira em'}{' '}

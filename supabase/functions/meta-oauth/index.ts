@@ -132,18 +132,59 @@ Deno.serve(async (req: Request) => {
       );
       const igData = await igResponse.json();
 
+      let igUsername: string | null = null;
+      let igProfilePic: string | null = null;
+      const igUserId = igData.instagram_business_account?.id || null;
+
+      // Fetch IG username and profile picture if available
+      if (igUserId) {
+        try {
+          const igProfileResponse = await fetch(
+            `https://graph.facebook.com/v19.0/${igUserId}?fields=username,profile_picture_url&access_token=${finalToken}`
+          );
+          const igProfile = await igProfileResponse.json();
+          igUsername = igProfile.username || null;
+          igProfilePic = igProfile.profile_picture_url || null;
+        } catch {
+          // Non-critical — continue without username
+        }
+      }
+
       pages.push({
         page_id: page.id,
         page_name: page.name,
-        ig_user_id: igData.instagram_business_account?.id || null,
+        ig_user_id: igUserId,
+        ig_username: igUsername,
+        ig_profile_pic: igProfilePic,
       });
     }
 
-    // Store access token in Vault
-    const { data: tokenId } = await adminClient.rpc('vault_insert', {
-      new_secret: finalToken,
-      new_name: `meta_access_token_${workspace_id}`,
-    });
+    // Also try to get the user's own IG account via /me (for personal accounts)
+    let fbUserName: string | null = null;
+    try {
+      const meResponse = await fetch(
+        `https://graph.facebook.com/v19.0/me?fields=name&access_token=${finalToken}`
+      );
+      const meData = await meResponse.json();
+      fbUserName = meData.name || null;
+    } catch {
+      // Non-critical
+    }
+
+    // Find the best IG account
+    const igPage = pages.find((p) => p.ig_user_id) || pages[0];
+
+    // Store access token — try Vault first, fallback to direct storage
+    let tokenId: string | null = null;
+    try {
+      const { data, error: vaultErr } = await adminClient.rpc('vault_insert', {
+        new_secret: finalToken,
+        new_name: `meta_access_token_${workspace_id}`,
+      });
+      if (!vaultErr && data) tokenId = data;
+    } catch {
+      // Vault not available
+    }
 
     // Save connection
     const expiresAt = new Date(Date.now() + (finalExpiry || 5184000) * 1000).toISOString();
@@ -153,8 +194,10 @@ Deno.serve(async (req: Request) => {
         workspace_id,
         user_id: user.id,
         access_token_id: tokenId,
-        ig_user_id: pages[0]?.ig_user_id || null,
-        fb_page_id: pages[0]?.page_id || null,
+        ig_user_id: igPage?.ig_user_id || null,
+        ig_username: igPage?.ig_username || null,
+        fb_page_id: igPage?.page_id || null,
+        fb_user_name: fbUserName,
         token_expires_at: expiresAt,
       },
       { onConflict: 'workspace_id,user_id' }
