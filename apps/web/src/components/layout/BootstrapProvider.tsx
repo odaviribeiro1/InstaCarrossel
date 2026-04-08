@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
 import { useBootstrap } from '@/hooks/use-bootstrap';
+import { useAuth } from '@/hooks/use-auth';
 import { Loader2 } from 'lucide-react';
 
 interface BootstrapProviderProps {
@@ -9,13 +10,16 @@ interface BootstrapProviderProps {
 
 /**
  * Wraps the app and manages the bootstrap flow.
- * Shows wizard if setup is incomplete, loading while checking,
- * or the main app if setup is complete.
+ * - No credentials → show wizard Step 1 (Supabase setup) — only for first-time platform setup
+ * - Credentials exist + user authenticated + no workspace → show wizard (onboarding)
+ * - Credentials exist + user authenticated + has workspace → show app
+ * - Auth pages (login/register) are handled outside this provider
  */
 export function BootstrapProvider({ children, wizard }: BootstrapProviderProps) {
   const { state } = useBootstrap();
+  const { isAuthenticated, loading: authLoading } = useAuth();
 
-  if (state === 'loading') {
+  if (state === 'loading' || authLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#0A0A0F' }}>
         <div className="flex flex-col items-center gap-4">
@@ -26,7 +30,13 @@ export function BootstrapProvider({ children, wizard }: BootstrapProviderProps) 
     );
   }
 
-  if (state === 'no_credentials' || state === 'setup_incomplete') {
+  // No Supabase credentials at all — need initial platform setup
+  if (state === 'no_credentials') {
+    return <>{wizard}</>;
+  }
+
+  // Credentials exist but setup incomplete + user authenticated → onboarding wizard
+  if (state === 'setup_incomplete' && isAuthenticated) {
     return <>{wizard}</>;
   }
 

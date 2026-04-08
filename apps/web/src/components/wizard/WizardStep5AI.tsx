@@ -136,7 +136,7 @@ export function WizardStep5AI() {
       await client.from('platform_config').update({ setup_step: 5 }).not('id', 'is', null);
 
       toast.success('Configuracao de IA salva');
-      setCurrentStep(7);
+      setCurrentStep(6);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao salvar configuracao');
     } finally {
@@ -288,7 +288,7 @@ export function WizardStep5AI() {
           </div>
 
           <div className="flex gap-2">
-            <Button type="button" variant="outline" onClick={() => setCurrentStep(5)} className="flex-1">
+            <Button type="button" variant="outline" onClick={() => setCurrentStep(4)} className="flex-1">
               Voltar
             </Button>
             <Button type="submit" className="flex-1" disabled={isLoading}>

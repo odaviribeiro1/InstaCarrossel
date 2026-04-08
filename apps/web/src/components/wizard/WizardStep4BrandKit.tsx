@@ -144,7 +144,7 @@ export function WizardStep4BrandKit() {
       await client.from('platform_config').update({ setup_step: 4 }).not('id', 'is', null);
 
       toast.success('Brand Kit criado');
-      setCurrentStep(6);
+      setCurrentStep(5);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao criar Brand Kit');
     } finally {
@@ -246,7 +246,7 @@ export function WizardStep4BrandKit() {
           </div>
 
           <div className="flex gap-2">
-            <Button type="button" variant="outline" onClick={() => setCurrentStep(4)} className="flex-1">
+            <Button type="button" variant="outline" onClick={() => setCurrentStep(3)} className="flex-1">
               Voltar
             </Button>
             <Button type="submit" className="flex-1" disabled={isLoading}>

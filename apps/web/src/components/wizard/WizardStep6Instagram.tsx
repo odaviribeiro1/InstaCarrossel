@@ -103,7 +103,7 @@ export function WizardStep6Instagram() {
       if (client) {
         await client.from('platform_config').update({ setup_step: 6 }).not('id', 'is', null);
       }
-      setCurrentStep(8);
+      setCurrentStep(7);
     })();
   }
 
@@ -187,7 +187,7 @@ export function WizardStep6Instagram() {
           </div>
 
           <div className="flex gap-2">
-            <Button type="button" variant="outline" onClick={() => setCurrentStep(6)} className="flex-1">
+            <Button type="button" variant="outline" onClick={() => setCurrentStep(5)} className="flex-1">
               Voltar
             </Button>
             <Button type="button" variant="ghost" onClick={skipStep} className="flex-1">

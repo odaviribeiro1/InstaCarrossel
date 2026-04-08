@@ -185,7 +185,7 @@ export function WizardStep3WhiteLabel() {
       document.documentElement.style.setProperty('--brand-secondary', safeSecondary);
 
       toast.success('Configuracao visual salva');
-      setCurrentStep(5);
+      setCurrentStep(4);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erro ao salvar configuracao';
       toast.error(msg);
@@ -376,7 +376,7 @@ export function WizardStep3WhiteLabel() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => setCurrentStep(3)}
+              onClick={() => setCurrentStep(2)}
               className="flex-1"
             >
               Voltar

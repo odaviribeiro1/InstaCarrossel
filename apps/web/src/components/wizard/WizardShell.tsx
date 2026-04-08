@@ -7,7 +7,6 @@ interface WizardShellProps {
 
 const stepLabels = [
   'Supabase',
-  'Conta',
   'Workspace',
   'Aparência',
   'Brand Kit',

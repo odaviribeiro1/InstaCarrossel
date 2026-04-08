@@ -178,7 +178,7 @@ export function WizardStep7FirstCarousel() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => setCurrentStep(7)}
+            onClick={() => setCurrentStep(6)}
             className="flex-1"
           >
             Voltar

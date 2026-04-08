@@ -20,7 +20,7 @@ interface WizardState {
 
 export const useWizardStore = create<WizardState>((set) => ({
   currentStep: 1,
-  totalSteps: 8,
+  totalSteps: 7,
   supabaseUrl: '',
   supabaseAnonKey: '',
   isConnecting: false,

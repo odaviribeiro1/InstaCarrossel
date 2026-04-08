@@ -40,42 +40,48 @@ const SuspenseFallback = (
 export function App() {
   return (
     <BrowserRouter>
-      <BootstrapProvider wizard={<Wizard />}>
-        <Suspense fallback={SuspenseFallback}>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route
-              path="/editor/:id"
-              element={
+      <Suspense fallback={SuspenseFallback}>
+        <Routes>
+          {/* Public auth routes — outside BootstrapProvider */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+
+          {/* All other routes — wrapped by BootstrapProvider */}
+          <Route
+            path="/*"
+            element={
+              <BootstrapProvider wizard={<Wizard />}>
                 <ProtectedRoute>
-                  <EditorPage />
+                  <Routes>
+                    <Route
+                      path="/editor/:id"
+                      element={<EditorPage />}
+                    />
+                    <Route
+                      path="/*"
+                      element={
+                        <AppShell>
+                          <Routes>
+                            <Route path="/" element={<DashboardPage />} />
+                            <Route path="/create" element={<CreateCarouselPage />} />
+                            <Route path="/templates" element={<TemplatesPage />} />
+                            <Route path="/settings/brand-kits" element={<BrandKitsPage />} />
+                            <Route path="/settings/ai" element={<AIConfigPage />} />
+                            <Route path="/settings/members" element={<MembersPage />} />
+                            <Route path="/settings" element={<SettingsPage />} />
+                            <Route path="*" element={<Navigate to="/" replace />} />
+                          </Routes>
+                        </AppShell>
+                      }
+                    />
+                  </Routes>
                 </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/*"
-              element={
-                <ProtectedRoute>
-                  <AppShell>
-                    <Routes>
-                      <Route path="/" element={<DashboardPage />} />
-                      <Route path="/create" element={<CreateCarouselPage />} />
-                      <Route path="/templates" element={<TemplatesPage />} />
-                      <Route path="/settings/brand-kits" element={<BrandKitsPage />} />
-                      <Route path="/settings/ai" element={<AIConfigPage />} />
-                      <Route path="/settings/members" element={<MembersPage />} />
-                      <Route path="/settings" element={<SettingsPage />} />
-                      <Route path="*" element={<Navigate to="/" replace />} />
-                    </Routes>
-                  </AppShell>
-                </ProtectedRoute>
-              }
-            />
-          </Routes>
-        </Suspense>
-      </BootstrapProvider>
+              </BootstrapProvider>
+            }
+          />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

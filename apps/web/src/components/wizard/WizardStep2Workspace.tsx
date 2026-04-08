@@ -152,7 +152,7 @@ export function WizardStep2Workspace() {
         .not('id', 'is', null);
 
       toast.success('Workspace criado com sucesso');
-      setCurrentStep(4);
+      setCurrentStep(3);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erro ao criar workspace';
       toast.error(msg);
