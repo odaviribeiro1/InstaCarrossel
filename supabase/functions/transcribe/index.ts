@@ -195,6 +195,30 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      // Try with App ID|Secret as client token (oEmbed supports this)
+      if (!token) {
+        try {
+          const { data: platformConfig } = await adminClient
+            .from('platform_config')
+            .select('meta_app_id, meta_app_secret')
+            .limit(1)
+            .single();
+
+          if (platformConfig?.meta_app_id && platformConfig?.meta_app_secret) {
+            const clientToken = `${platformConfig.meta_app_id}|${platformConfig.meta_app_secret}`;
+            const caption = await fetchReelCaption(url, clientToken);
+            if (caption) {
+              return new Response(
+                JSON.stringify({ transcript: caption, source: 'instagram_oembed' }),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              );
+            }
+          }
+        } catch (err) {
+          console.error('oEmbed with client token error:', err);
+        }
+      }
+
       // Fallback: try noembed for caption
       try {
         const noembedResponse = await fetch(`https://noembed.com/embed?url=${encodeURIComponent(url)}`);
