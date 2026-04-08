@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useBootstrap } from '@/hooks/use-bootstrap';
 import { useAuth } from '@/hooks/use-auth';
 import { Loader2 } from 'lucide-react';
@@ -10,14 +11,15 @@ interface BootstrapProviderProps {
 
 /**
  * Wraps the app and manages the bootstrap flow.
- * - No credentials → show wizard Step 1 (Supabase setup) — only for first-time platform setup
+ * - No credentials + /setup route → show wizard Step 1 (platform admin setup)
+ * - No credentials + any other route → redirect to /login
  * - Credentials exist + user authenticated + no workspace → show wizard (onboarding)
  * - Credentials exist + user authenticated + has workspace → show app
- * - Auth pages (login/register) are handled outside this provider
  */
 export function BootstrapProvider({ children, wizard }: BootstrapProviderProps) {
   const { state } = useBootstrap();
   const { isAuthenticated, loading: authLoading } = useAuth();
+  const location = useLocation();
 
   if (state === 'loading' || authLoading) {
     return (
@@ -30,9 +32,12 @@ export function BootstrapProvider({ children, wizard }: BootstrapProviderProps) 
     );
   }
 
-  // No Supabase credentials at all — need initial platform setup
+  // No Supabase credentials — only show wizard if explicitly on /setup
   if (state === 'no_credentials') {
-    return <>{wizard}</>;
+    if (location.pathname === '/setup') {
+      return <>{wizard}</>;
+    }
+    return <Navigate to="/login" replace />;
   }
 
   // Credentials exist but setup incomplete + user authenticated → onboarding wizard

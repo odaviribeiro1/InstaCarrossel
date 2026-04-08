@@ -42,10 +42,11 @@ export function App() {
     <BrowserRouter>
       <Suspense fallback={SuspenseFallback}>
         <Routes>
-          {/* Public auth routes — outside BootstrapProvider */}
+          {/* Public routes — outside BootstrapProvider */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/setup" element={<Wizard />} />
 
           {/* All other routes — wrapped by BootstrapProvider */}
           <Route
