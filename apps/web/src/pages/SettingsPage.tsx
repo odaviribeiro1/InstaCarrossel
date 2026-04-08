@@ -625,13 +625,20 @@ function InstagramTab() {
   const [isSavingMeta, setIsSavingMeta] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
 
+  const [savedMetaConfig, setSavedMetaConfig] = useState<{ meta_app_id: string | null; has_app_secret: boolean } | null>(null);
+
   const { data: metaConfig, refetch: refetchMetaConfig } = useQuery({
     queryKey: ['meta-config', activeWorkspace?.id],
     queryFn: async () => {
       const client = getSupabaseClient();
       if (!client) return null;
-      const { data } = await client.rpc('get_meta_config');
-      return data as { meta_app_id: string | null; has_app_secret: boolean } | null;
+      try {
+        const { data, error } = await client.rpc('get_meta_config');
+        if (error) return null;
+        return data as { meta_app_id: string | null; has_app_secret: boolean } | null;
+      } catch {
+        return null;
+      }
     },
     enabled: Boolean(activeWorkspace),
   });
@@ -674,6 +681,7 @@ function InstagramTab() {
       if (error) throw new Error(error.message || 'Erro ao salvar configuracao Meta');
 
       toast.success('Configuracao Meta salva');
+      setSavedMetaConfig({ meta_app_id: data.metaAppId, has_app_secret: true });
       void refetchMetaConfig();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao salvar');
@@ -712,7 +720,8 @@ function InstagramTab() {
     }
   }
 
-  const hasMetaCredentials = Boolean(metaConfig?.meta_app_id && metaConfig?.has_app_secret);
+  const effectiveMetaConfig = savedMetaConfig ?? metaConfig;
+  const hasMetaCredentials = Boolean(effectiveMetaConfig?.meta_app_id && effectiveMetaConfig?.has_app_secret);
 
   return (
     <div className="space-y-6">
@@ -760,12 +769,12 @@ function InstagramTab() {
               {metaErrors.metaAppSecret && <p className="text-sm text-red-400">{metaErrors.metaAppSecret.message}</p>}
             </div>
 
-            {metaConfig?.meta_app_id && (
+            {effectiveMetaConfig?.meta_app_id && (
               <div className="rounded-xl border border-[rgba(59,130,246,0.12)] bg-[rgba(59,130,246,0.04)] p-3">
                 <p className="text-xs text-[#94A3B8]">
                   <CheckCircle2 className="mr-1.5 inline h-3.5 w-3.5 text-emerald-400" />
-                  App ID configurado: {metaConfig.meta_app_id}
-                  {metaConfig.has_app_secret && ' | App Secret configurado'}
+                  App ID configurado: {effectiveMetaConfig.meta_app_id}
+                  {effectiveMetaConfig.has_app_secret && ' | App Secret configurado'}
                 </p>
               </div>
             )}
