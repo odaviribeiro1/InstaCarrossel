@@ -1,0 +1,17 @@
+{
+  "name": "content-hub",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @content-hub/web dev",
+    "build": "pnpm --filter @content-hub/web build",
+    "lint": "pnpm --filter @content-hub/web lint",
+    "preview": "pnpm --filter @content-hub/web preview"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  }
+}

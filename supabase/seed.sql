@@ -1,0 +1,4 @@
+-- Seed data: system templates
+-- These templates are inserted by the frontend via Edge Function.
+-- See apps/web/src/lib/templates/system-templates.ts for Konva layout JSON.
+-- Templates with workspace_id = NULL and is_system = true are global.
