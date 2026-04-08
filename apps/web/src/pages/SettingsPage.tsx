@@ -690,20 +690,20 @@ function InstagramTab() {
     }
   }
 
-  // Handle OAuth callback — detect ?code= in URL after Facebook redirect
+  // Effect 1: Capture OAuth params immediately on mount (no async dependencies)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
     const state = params.get('state');
-    const error = params.get('error');
+    const errorParam = params.get('error');
 
-    if (!code || !activeWorkspace) return;
+    if (!code) return;
 
-    // Clean URL immediately
+    // Clean URL immediately so params don't persist
     window.history.replaceState({}, '', window.location.pathname);
 
-    if (error) {
-      toast.error(`Erro no OAuth: ${params.get('error_description') || error}`);
+    if (errorParam) {
+      toast.error(`Erro no OAuth: ${params.get('error_description') || errorParam}`);
       return;
     }
 
@@ -715,7 +715,17 @@ function InstagramTab() {
     }
     sessionStorage.removeItem('meta_oauth_state');
 
-    // Exchange code for token via Edge Function
+    // Persist code for exchange when workspace is ready
+    sessionStorage.setItem('meta_oauth_code', code);
+  }, []);
+
+  // Effect 2: Exchange code when workspace is ready
+  useEffect(() => {
+    const code = sessionStorage.getItem('meta_oauth_code');
+    if (!code || !activeWorkspace) return;
+
+    sessionStorage.removeItem('meta_oauth_code');
+
     async function exchangeCode() {
       setIsConnecting(true);
       try {
