@@ -126,7 +126,7 @@ Deno.serve(async (req: Request) => {
     // Get AI config
     const { data: aiConfig } = await adminClient
       .from('ai_configs')
-      .select('llm_provider, llm_model, llm_api_key_id')
+      .select('llm_provider, llm_model, llm_api_key_id, llm_api_key')
       .eq('workspace_id', workspace_id || '')
       .maybeSingle();
 
@@ -137,17 +137,24 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Retrieve API key from Vault
+    // Retrieve API key: Vault first, then direct column
     let apiKey = '';
     if (aiConfig.llm_api_key_id) {
-      const { data: secretData } = await adminClient.rpc('vault_read', {
-        secret_id: aiConfig.llm_api_key_id,
-      });
-      apiKey = secretData || '';
+      try {
+        const { data: secretData } = await adminClient.rpc('vault_read', {
+          secret_id: aiConfig.llm_api_key_id,
+        });
+        apiKey = secretData || '';
+      } catch {
+        // Vault not available
+      }
+    }
+    if (!apiKey && aiConfig.llm_api_key) {
+      apiKey = aiConfig.llm_api_key;
     }
 
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: 'API Key nao encontrada' }), {
+      return new Response(JSON.stringify({ error: 'API Key nao encontrada. Salve a chave nas configuracoes de IA.' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
