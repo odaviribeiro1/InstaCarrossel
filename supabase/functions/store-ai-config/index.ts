@@ -76,28 +76,48 @@ Deno.serve(async (req: Request) => {
     let imagenKeyId: string | null = null;
     let supadataKeyId: string | null = null;
 
+    // Store in Vault with direct column fallback
+    let directLlmKey: string | null = null;
+    let directImagenKey: string | null = null;
+    let directSupadataKey: string | null = null;
+
     if (llm_api_key) {
-      const { data } = await adminClient.rpc('vault_insert', {
-        new_secret: llm_api_key,
-        new_name: `llm_api_key_${workspace_id}`,
-      });
-      llmKeyId = data;
+      try {
+        const { data, error: ve } = await adminClient.rpc('vault_insert', {
+          new_secret: llm_api_key,
+          new_name: `llm_api_key_${workspace_id}`,
+        });
+        if (!ve && data) llmKeyId = data;
+        else directLlmKey = llm_api_key;
+      } catch {
+        directLlmKey = llm_api_key;
+      }
     }
 
     if (imagen_api_key) {
-      const { data } = await adminClient.rpc('vault_insert', {
-        new_secret: imagen_api_key,
-        new_name: `imagen_api_key_${workspace_id}`,
-      });
-      imagenKeyId = data;
+      try {
+        const { data, error: ve } = await adminClient.rpc('vault_insert', {
+          new_secret: imagen_api_key,
+          new_name: `imagen_api_key_${workspace_id}`,
+        });
+        if (!ve && data) imagenKeyId = data;
+        else directImagenKey = imagen_api_key;
+      } catch {
+        directImagenKey = imagen_api_key;
+      }
     }
 
     if (supadata_api_key) {
-      const { data } = await adminClient.rpc('vault_insert', {
-        new_secret: supadata_api_key,
-        new_name: `supadata_api_key_${workspace_id}`,
-      });
-      supadataKeyId = data;
+      try {
+        const { data, error: ve } = await adminClient.rpc('vault_insert', {
+          new_secret: supadata_api_key,
+          new_name: `supadata_api_key_${workspace_id}`,
+        });
+        if (!ve && data) supadataKeyId = data;
+        else directSupadataKey = supadata_api_key;
+      } catch {
+        directSupadataKey = supadata_api_key;
+      }
     }
 
     // Upsert ai_configs
@@ -109,6 +129,9 @@ Deno.serve(async (req: Request) => {
         llm_api_key_id: llmKeyId,
         imagen_api_key_id: imagenKeyId,
         supadata_api_key_id: supadataKeyId,
+        llm_api_key: directLlmKey,
+        imagen_api_key: directImagenKey,
+        supadata_api_key: directSupadataKey,
       },
       { onConflict: 'workspace_id' }
     );

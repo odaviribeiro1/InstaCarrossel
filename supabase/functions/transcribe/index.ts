@@ -209,31 +209,19 @@ Deno.serve(async (req: Request) => {
       // Scrape reel via Apify
       const reel = await scrapeReelViaApify(url, apifyToken);
 
-      // If caption exists and audio transcription not explicitly requested, return caption
-      if (reel.caption && !transcribe_audio) {
-        return new Response(
-          JSON.stringify({
-            transcript: reel.caption,
-            source: 'instagram_caption',
-            owner: reel.ownerUsername,
-            hasAudio: Boolean(reel.audioUrl || reel.videoUrl),
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Transcribe audio via Whisper if requested or caption empty
+      // Always transcribe audio via Whisper (caption as fallback)
       const audioSource = reel.audioUrl || reel.videoUrl;
       if (audioSource) {
         // Get OpenAI key from ai_configs
         const { data: aiConfig } = await adminClient
           .from('ai_configs')
-          .select('llm_provider, llm_api_key_id')
+          .select('llm_provider, llm_api_key_id, llm_api_key')
           .eq('workspace_id', workspace_id || '')
           .maybeSingle();
 
         let openaiKey: string | null = null;
 
+        // Try Vault first
         if (aiConfig?.llm_api_key_id) {
           try {
             const { data: key } = await adminClient.rpc('vault_read', {
@@ -245,7 +233,12 @@ Deno.serve(async (req: Request) => {
           }
         }
 
-        // Fallback: check env var
+        // Fallback: direct column
+        if (!openaiKey && aiConfig?.llm_api_key) {
+          openaiKey = aiConfig.llm_api_key;
+        }
+
+        // Fallback: env var
         if (!openaiKey) {
           openaiKey = Deno.env.get('OPENAI_API_KEY') || null;
         }
