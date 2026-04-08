@@ -386,6 +386,13 @@ export function CreateCarouselPage() {
               setGeneratedSlides([]);
               setStep(2);
             }}
+            onUpdateSlide={(position, field, value) => {
+              setGeneratedSlides((prev) =>
+                prev.map((s) =>
+                  s.position === position ? { ...s, [field]: value } : s
+                )
+              );
+            }}
           />
         )}
       </div>

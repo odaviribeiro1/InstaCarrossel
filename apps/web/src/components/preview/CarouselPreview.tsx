@@ -1,5 +1,6 @@
 import { Check, X, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Card,
   CardContent,
@@ -14,6 +15,7 @@ interface CarouselPreviewProps {
   onAccept: () => void;
   onReject: () => void;
   onRegenerate: () => void;
+  onUpdateSlide?: (position: number, field: keyof SlideContent, value: string) => void;
 }
 
 const typeLabels: Record<string, string> = {
@@ -28,6 +30,7 @@ export function CarouselPreview({
   onAccept,
   onReject,
   onRegenerate,
+  onUpdateSlide,
 }: CarouselPreviewProps) {
   return (
     <Card>
@@ -65,10 +68,10 @@ export function CarouselPreview({
           ))}
         </div>
 
-        {/* Slide details */}
-        <div className="space-y-2">
+        {/* Slide details — editable */}
+        <div className="space-y-3">
           {slides.map((slide) => (
-            <div key={slide.position} className="rounded-md border p-3">
+            <div key={slide.position} className="rounded-lg border border-[rgba(59,130,246,0.12)] p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(59,130,246,0.1)] text-xs font-bold text-[#3B82F6]">
                   {slide.position}
@@ -77,8 +80,33 @@ export function CarouselPreview({
                   {typeLabels[slide.type] ?? slide.type}
                 </span>
               </div>
-              <p className="mt-1 text-sm font-semibold">{slide.headline}</p>
-              <p className="text-xs text-[#94A3B8]">{slide.body}</p>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-medium text-[#94A3B8] uppercase tracking-wider">Titulo</label>
+                <Input
+                  value={slide.headline}
+                  onChange={(e) => onUpdateSlide?.(slide.position, 'headline', e.target.value)}
+                  className="text-sm font-semibold"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-medium text-[#94A3B8] uppercase tracking-wider">Corpo</label>
+                <textarea
+                  value={slide.body}
+                  onChange={(e) => onUpdateSlide?.(slide.position, 'body', e.target.value)}
+                  rows={2}
+                  className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-xs text-[#94A3B8] ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+                />
+              </div>
+              {slide.cta && (
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-medium text-[#94A3B8] uppercase tracking-wider">CTA</label>
+                  <Input
+                    value={slide.cta}
+                    onChange={(e) => onUpdateSlide?.(slide.position, 'cta', e.target.value)}
+                    className="text-xs"
+                  />
+                </div>
+              )}
             </div>
           ))}
         </div>
