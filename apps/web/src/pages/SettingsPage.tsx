@@ -621,7 +621,7 @@ type MetaConfigFormValues = z.infer<typeof metaConfigSchema>;
 
 function InstagramTab() {
   const { activeWorkspace } = useWorkspaceStore();
-  const [isConnecting] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
   const [isSavingMeta, setIsSavingMeta] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
 
@@ -722,6 +722,32 @@ function InstagramTab() {
 
   const effectiveMetaConfig = savedMetaConfig ?? metaConfig;
   const hasMetaCredentials = Boolean(effectiveMetaConfig?.meta_app_id);
+
+  function handleConnectInstagram() {
+    const appId = effectiveMetaConfig?.meta_app_id;
+    if (!appId) {
+      toast.error('Configure o Meta App ID primeiro');
+      return;
+    }
+
+    setIsConnecting(true);
+
+    // Generate CSRF state token
+    const state = crypto.randomUUID();
+    sessionStorage.setItem('meta_oauth_state', state);
+
+    const redirectUri = `${window.location.origin}/settings`;
+    const scope = 'instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement';
+
+    const authUrl = new URL('https://www.facebook.com/v21.0/dialog/oauth');
+    authUrl.searchParams.set('client_id', appId);
+    authUrl.searchParams.set('redirect_uri', redirectUri);
+    authUrl.searchParams.set('scope', scope);
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('state', state);
+
+    window.location.href = authUrl.toString();
+  }
 
   return (
     <div className="space-y-6">
@@ -850,7 +876,7 @@ function InstagramTab() {
                   Configure o Meta App ID e App Secret acima antes de conectar.
                 </p>
               )}
-              <Button className="mt-4" disabled={isConnecting || !hasMetaCredentials}>
+              <Button className="mt-4" disabled={isConnecting || !hasMetaCredentials} onClick={handleConnectInstagram}>
                 {isConnecting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Conectar Instagram
               </Button>
