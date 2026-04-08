@@ -20,6 +20,33 @@ function extractYouTubeId(url: string): string | null {
   return null;
 }
 
+function extractReelShortcode(url: string): string | null {
+  const match = url.match(/instagram\.com\/(?:reel|p)\/([a-zA-Z0-9_-]+)/);
+  return match?.[1] || null;
+}
+
+async function fetchReelViaRapidAPI(url: string, rapidApiKey: string): Promise<{ caption: string | null; videoUrl: string | null }> {
+  // Try Instagram Scraper API on RapidAPI
+  const response = await fetch(`https://instagram-scraper-api2.p.rapidapi.com/v1/post_info?code_or_id_or_url=${encodeURIComponent(url)}`, {
+    headers: {
+      'x-rapidapi-key': rapidApiKey,
+      'x-rapidapi-host': 'instagram-scraper-api2.p.rapidapi.com',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`RapidAPI responded with ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  // Extract caption and video URL from response
+  const caption = data?.data?.caption?.text || null;
+  const videoUrl = data?.data?.video_url || null;
+
+  return { caption, videoUrl };
+}
+
 Deno.serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
 
@@ -128,9 +155,25 @@ Deno.serve(async (req: Request) => {
     }
 
     if (urlType === 'reels') {
-      // Try extracting caption from Instagram oEmbed API (public, no key needed)
+      const rapidApiKey = Deno.env.get('RAPIDAPI_KEY');
+
+      if (rapidApiKey) {
+        try {
+          const { caption } = await fetchReelViaRapidAPI(url, rapidApiKey);
+
+          if (caption) {
+            return new Response(
+              JSON.stringify({ transcript: caption, source: 'instagram_caption' }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+        } catch (err) {
+          console.error('RapidAPI Instagram error:', err);
+        }
+      }
+
+      // Fallback: try noembed for caption
       try {
-        // Try extracting caption via noembed (public service)
         const noembedResponse = await fetch(`https://noembed.com/embed?url=${encodeURIComponent(url)}`);
         if (noembedResponse.ok) {
           const noembedData = await noembedResponse.json();
@@ -142,33 +185,7 @@ Deno.serve(async (req: Request) => {
           }
         }
       } catch {
-        // noembed failed, continue
-      }
-
-      // Try Supadata for Reels transcription if key available
-      if (aiConfig?.supadata_api_key_id) {
-        try {
-          const { data: supadataKey } = await adminClient.rpc('vault_read', {
-            secret_id: aiConfig.supadata_api_key_id,
-          });
-
-          if (supadataKey) {
-            const response = await fetch(
-              `https://api.supadata.ai/v1/transcribe?url=${encodeURIComponent(url)}`,
-              { headers: { 'x-api-key': supadataKey } }
-            );
-            if (response.ok) {
-              const data = await response.json();
-              const transcript = data.content || data.text || JSON.stringify(data);
-              return new Response(
-                JSON.stringify({ transcript, source: 'supadata' }),
-                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-              );
-            }
-          }
-        } catch {
-          // Supadata failed
-        }
+        // noembed failed
       }
 
       return new Response(
