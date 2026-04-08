@@ -127,12 +127,66 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // For other URL types, return a message about needing Whisper
+    if (urlType === 'reels') {
+      // Try extracting caption from Instagram oEmbed API (public, no key needed)
+      try {
+        // Try extracting caption via noembed (public service)
+        const noembedResponse = await fetch(`https://noembed.com/embed?url=${encodeURIComponent(url)}`);
+        if (noembedResponse.ok) {
+          const noembedData = await noembedResponse.json();
+          if (noembedData.title) {
+            return new Response(
+              JSON.stringify({ transcript: noembedData.title, source: 'caption' }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+        }
+      } catch {
+        // noembed failed, continue
+      }
+
+      // Try Supadata for Reels transcription if key available
+      if (aiConfig?.supadata_api_key_id) {
+        try {
+          const { data: supadataKey } = await adminClient.rpc('vault_read', {
+            secret_id: aiConfig.supadata_api_key_id,
+          });
+
+          if (supadataKey) {
+            const response = await fetch(
+              `https://api.supadata.ai/v1/transcribe?url=${encodeURIComponent(url)}`,
+              { headers: { 'x-api-key': supadataKey } }
+            );
+            if (response.ok) {
+              const data = await response.json();
+              const transcript = data.content || data.text || JSON.stringify(data);
+              return new Response(
+                JSON.stringify({ transcript, source: 'supadata' }),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              );
+            }
+          }
+        } catch {
+          // Supadata failed
+        }
+      }
+
+      return new Response(
+        JSON.stringify({ error: 'Nao foi possivel extrair conteudo do Reel. Tente colar o texto manualmente.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (urlType === 'twitter') {
+      return new Response(
+        JSON.stringify({ error: 'Transcricao de Twitter/X em implementacao. Cole o texto da thread manualmente.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     return new Response(
-      JSON.stringify({
-        error: `Transcricao de ${urlType} requer Whisper API. Funcionalidade em implementacao.`,
-      }),
-      { status: 501, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: 'Tipo de URL nao suportado. Use YouTube, Reels ou cole o texto manualmente.' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err) {
     return new Response(JSON.stringify({ error: String(err) }), {
