@@ -612,9 +612,75 @@ function AITab() {
 // INSTAGRAM
 // ============================================================
 
+const metaConfigSchema = z.object({
+  metaAppId: z.string().min(1, 'Meta App ID e obrigatorio'),
+  metaAppSecret: z.string().min(1, 'Meta App Secret e obrigatorio'),
+});
+
+type MetaConfigFormValues = z.infer<typeof metaConfigSchema>;
+
 function InstagramTab() {
   const { activeWorkspace } = useWorkspaceStore();
   const [isConnecting] = useState(false);
+  const [isSavingMeta, setIsSavingMeta] = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
+
+  const { data: metaConfig, refetch: refetchMetaConfig } = useQuery({
+    queryKey: ['meta-config', activeWorkspace?.id],
+    queryFn: async () => {
+      const client = getSupabaseClient();
+      if (!client) return null;
+      const { data } = await client.rpc('get_meta_config');
+      return data as { meta_app_id: string | null; has_app_secret: boolean } | null;
+    },
+    enabled: Boolean(activeWorkspace),
+  });
+
+  const {
+    register: registerMeta,
+    handleSubmit: handleSubmitMeta,
+    reset: resetMeta,
+    formState: { errors: metaErrors },
+  } = useForm<MetaConfigFormValues>({
+    resolver: zodResolver(metaConfigSchema),
+    defaultValues: {
+      metaAppId: '',
+      metaAppSecret: '',
+    },
+  });
+
+  useEffect(() => {
+    if (metaConfig) {
+      resetMeta({
+        metaAppId: metaConfig.meta_app_id ?? '',
+        metaAppSecret: '',
+      });
+    }
+  }, [metaConfig, resetMeta]);
+
+  async function onSaveMetaConfig(data: MetaConfigFormValues) {
+    setIsSavingMeta(true);
+    try {
+      const client = getSupabaseClient();
+      if (!client) throw new Error('Supabase nao configurado');
+
+      const { error } = await client.functions.invoke('store-meta-config', {
+        body: {
+          meta_app_id: data.metaAppId,
+          meta_app_secret: data.metaAppSecret,
+        },
+      });
+
+      if (error) throw new Error(error.message || 'Erro ao salvar configuracao Meta');
+
+      toast.success('Configuracao Meta salva');
+      void refetchMetaConfig();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao salvar');
+    } finally {
+      setIsSavingMeta(false);
+    }
+  }
 
   const { data: connection, isLoading } = useQuery({
     queryKey: ['meta-connection', activeWorkspace?.id],
@@ -646,69 +712,144 @@ function InstagramTab() {
     }
   }
 
+  const hasMetaCredentials = Boolean(metaConfig?.meta_app_id && metaConfig?.has_app_secret);
+
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[rgba(59,130,246,0.1)]">
-            <Instagram className="h-5 w-5 text-[#3B82F6]" />
+    <div className="space-y-6">
+      {/* Meta App Credentials */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[rgba(59,130,246,0.1)]">
+              <Instagram className="h-5 w-5 text-[#3B82F6]" />
+            </div>
+            <div>
+              <CardTitle className="text-lg">Credenciais Meta</CardTitle>
+              <CardDescription>Configure o Meta App ID e App Secret para conectar ao Instagram.</CardDescription>
+            </div>
           </div>
-          <div>
-            <CardTitle className="text-lg">Conexao com Instagram</CardTitle>
-            <CardDescription>Conecte sua conta para publicar carrosseis diretamente.</CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {isLoading ? (
-          <div className="flex justify-center py-6">
-            <Loader2 className="h-5 w-5 animate-spin text-[#3B82F6]" />
-          </div>
-        ) : connection ? (
-          <>
-            <div className="flex items-center justify-between rounded-xl border border-[rgba(59,130,246,0.12)] bg-[rgba(59,130,246,0.04)] px-4 py-3">
-              <div>
-                <p className="text-sm font-medium text-[#F8FAFC]">
-                  <CheckCircle2 className="mr-2 inline h-4 w-4 text-emerald-400" />
-                  Conectado
-                </p>
-                <p className="mt-1 text-xs text-[#94A3B8]">
-                  IG User ID: {connection.ig_user_id ?? 'N/A'}
-                </p>
-                {connection.token_expires_at && (
-                  <p className={`mt-0.5 text-xs ${isExpired ? 'text-red-400' : 'text-[#94A3B8]'}`}>
-                    Token {isExpired ? 'expirado em' : 'expira em'}{' '}
-                    {new Date(connection.token_expires_at).toLocaleDateString('pt-BR')}
-                  </p>
-                )}
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmitMeta(onSaveMetaConfig)} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="meta-app-id">Meta App ID</Label>
+              <Input id="meta-app-id" placeholder="123456789012345" {...registerMeta('metaAppId')} />
+              {metaErrors.metaAppId && <p className="text-sm text-red-400">{metaErrors.metaAppId.message}</p>}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="meta-app-secret">Meta App Secret</Label>
+              <div className="relative">
+                <Input
+                  id="meta-app-secret"
+                  type={showSecret ? 'text' : 'password'}
+                  placeholder={metaConfig?.has_app_secret ? '••••••••••••••••' : 'Insira o App Secret'}
+                  {...registerMeta('metaAppSecret')}
+                />
+                <button
+                  type="button"
+                  className="absolute right-2 top-2"
+                  onClick={() => setShowSecret((s) => !s)}
+                >
+                  {showSecret ? (
+                    <EyeOff className="h-4 w-4 text-[#94A3B8]" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-[#94A3B8]" />
+                  )}
+                </button>
               </div>
-              <Button variant="outline" size="sm" onClick={handleDisconnect}>
-                Desconectar
+              {metaErrors.metaAppSecret && <p className="text-sm text-red-400">{metaErrors.metaAppSecret.message}</p>}
+            </div>
+
+            {metaConfig?.meta_app_id && (
+              <div className="rounded-xl border border-[rgba(59,130,246,0.12)] bg-[rgba(59,130,246,0.04)] p-3">
+                <p className="text-xs text-[#94A3B8]">
+                  <CheckCircle2 className="mr-1.5 inline h-3.5 w-3.5 text-emerald-400" />
+                  App ID configurado: {metaConfig.meta_app_id}
+                  {metaConfig.has_app_secret && ' | App Secret configurado'}
+                </p>
+              </div>
+            )}
+
+            <div className="rounded-xl border border-[rgba(59,130,246,0.12)] bg-[rgba(59,130,246,0.04)] p-3">
+              <p className="text-xs text-[#94A3B8]">
+                O App Secret e criptografado server-side via Supabase Vault e nunca fica exposto no browser.
+              </p>
+            </div>
+
+            <Button type="submit" disabled={isSavingMeta}>
+              {isSavingMeta && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Salvar Credenciais
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Connection Status */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[rgba(59,130,246,0.1)]">
+              <Instagram className="h-5 w-5 text-[#3B82F6]" />
+            </div>
+            <div>
+              <CardTitle className="text-lg">Conexao com Instagram</CardTitle>
+              <CardDescription>Conecte sua conta para publicar carrosseis diretamente.</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isLoading ? (
+            <div className="flex justify-center py-6">
+              <Loader2 className="h-5 w-5 animate-spin text-[#3B82F6]" />
+            </div>
+          ) : connection ? (
+            <>
+              <div className="flex items-center justify-between rounded-xl border border-[rgba(59,130,246,0.12)] bg-[rgba(59,130,246,0.04)] px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium text-[#F8FAFC]">
+                    <CheckCircle2 className="mr-2 inline h-4 w-4 text-emerald-400" />
+                    Conectado
+                  </p>
+                  <p className="mt-1 text-xs text-[#94A3B8]">
+                    IG User ID: {connection.ig_user_id ?? 'N/A'}
+                  </p>
+                  {connection.token_expires_at && (
+                    <p className={`mt-0.5 text-xs ${isExpired ? 'text-red-400' : 'text-[#94A3B8]'}`}>
+                      Token {isExpired ? 'expirado em' : 'expira em'}{' '}
+                      {new Date(connection.token_expires_at).toLocaleDateString('pt-BR')}
+                    </p>
+                  )}
+                </div>
+                <Button variant="outline" size="sm" onClick={handleDisconnect}>
+                  Desconectar
+                </Button>
+              </div>
+              {isExpired && (
+                <p className="text-xs text-red-400">
+                  O token expirou. Reconecte sua conta para continuar publicando.
+                </p>
+              )}
+            </>
+          ) : (
+            <div className="rounded-xl border border-[rgba(59,130,246,0.12)] bg-[rgba(59,130,246,0.04)] p-6 text-center">
+              <Instagram className="mx-auto h-10 w-10 text-[#94A3B8]" />
+              <p className="mt-3 text-sm text-[#94A3B8]">
+                Nenhuma conta do Instagram conectada.
+              </p>
+              {!hasMetaCredentials && (
+                <p className="mt-1 text-xs text-[#94A3B8]/60">
+                  Configure o Meta App ID e App Secret acima antes de conectar.
+                </p>
+              )}
+              <Button className="mt-4" disabled={isConnecting || !hasMetaCredentials}>
+                {isConnecting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Conectar Instagram
               </Button>
             </div>
-            {isExpired && (
-              <p className="text-xs text-red-400">
-                O token expirou. Reconecte sua conta para continuar publicando.
-              </p>
-            )}
-          </>
-        ) : (
-          <div className="rounded-xl border border-[rgba(59,130,246,0.12)] bg-[rgba(59,130,246,0.04)] p-6 text-center">
-            <Instagram className="mx-auto h-10 w-10 text-[#94A3B8]" />
-            <p className="mt-3 text-sm text-[#94A3B8]">
-              Nenhuma conta do Instagram conectada.
-            </p>
-            <p className="mt-1 text-xs text-[#94A3B8]/60">
-              A conexao requer Meta App ID e App Secret configurados na aba de setup.
-            </p>
-            <Button className="mt-4" disabled={isConnecting}>
-              {isConnecting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Conectar Instagram
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 

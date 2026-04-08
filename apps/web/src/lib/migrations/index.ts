@@ -849,4 +849,33 @@ $$;
 
 GRANT EXECUTE ON FUNCTION create_workspace_with_owner(text, text) TO authenticated;`,
   },
+  {
+    version: '013_get_meta_config',
+    description: 'Funcao RPC para retornar status das credenciais Meta',
+    sql: `CREATE OR REPLACE FUNCTION get_meta_config()
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  result jsonb;
+BEGIN
+  SELECT jsonb_build_object(
+    'meta_app_id', pc.meta_app_id,
+    'has_app_secret', (pc.meta_app_secret_id IS NOT NULL)
+  ) INTO result
+  FROM platform_config pc
+  LIMIT 1;
+
+  IF result IS NULL THEN
+    RETURN jsonb_build_object('meta_app_id', null, 'has_app_secret', false);
+  END IF;
+
+  RETURN result;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION get_meta_config() TO authenticated;`,
+  },
 ];

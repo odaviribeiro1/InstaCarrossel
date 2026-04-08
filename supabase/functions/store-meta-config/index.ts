@@ -33,26 +33,20 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json();
-    const { meta_app_id, meta_app_secret, workspace_id } = body;
+    const { meta_app_id, meta_app_secret } = body;
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    // Verify workspace membership and role (owner or admin only)
-    if (!workspace_id) {
-      return new Response(JSON.stringify({ error: 'workspace_id e obrigatorio' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
+    // Verify user is owner or admin of at least one workspace
     const { data: member } = await adminClient
       .from('workspace_members')
       .select('role')
-      .eq('workspace_id', workspace_id)
       .eq('user_id', user.id)
+      .in('role', ['owner', 'admin'])
+      .limit(1)
       .maybeSingle();
 
-    if (!member || !['owner', 'admin'].includes(member.role)) {
+    if (!member) {
       return new Response(JSON.stringify({ error: 'Acesso negado. Apenas owner ou admin podem alterar configuracoes Meta.' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
