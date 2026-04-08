@@ -53,23 +53,40 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Store App Secret in Vault
+    // Try to store App Secret in Vault, fallback to direct column
     let secretId: string | null = null;
+    let directSecret: string | null = null;
+
     if (meta_app_secret) {
-      const { data } = await adminClient.rpc('vault_insert', {
-        new_secret: meta_app_secret,
-        new_name: 'meta_app_secret',
-      });
-      secretId = data;
+      try {
+        const { data, error: vaultError } = await adminClient.rpc('vault_insert', {
+          new_secret: meta_app_secret,
+          new_name: 'meta_app_secret',
+        });
+        if (vaultError || !data) {
+          // Vault not available — store directly
+          directSecret = meta_app_secret;
+        } else {
+          secretId = data;
+        }
+      } catch {
+        // Vault extension not installed — store directly
+        directSecret = meta_app_secret;
+      }
     }
 
     // Update platform_config
+    const updateData: Record<string, unknown> = { meta_app_id };
+    if (secretId) {
+      updateData.meta_app_secret_id = secretId;
+    }
+    if (directSecret) {
+      updateData.meta_app_secret = directSecret;
+    }
+
     const { error } = await adminClient
       .from('platform_config')
-      .update({
-        meta_app_id,
-        meta_app_secret_id: secretId,
-      })
+      .update(updateData)
       .not('id', 'is', null);
 
     if (error) {

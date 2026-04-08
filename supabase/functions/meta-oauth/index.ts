@@ -55,26 +55,38 @@ Deno.serve(async (req: Request) => {
     // Get Meta App credentials from platform_config
     const { data: config } = await adminClient
       .from('platform_config')
-      .select('meta_app_id, meta_app_secret_id')
+      .select('meta_app_id, meta_app_secret_id, meta_app_secret')
       .limit(1)
       .single();
 
-    if (!config?.meta_app_id || !config?.meta_app_secret_id) {
-      return new Response(JSON.stringify({ error: 'Credenciais Meta nao configuradas' }), {
+    if (!config?.meta_app_id) {
+      return new Response(JSON.stringify({ error: 'Meta App ID nao configurado' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Retrieve App Secret from Vault
-    const { data: secretData } = await adminClient.rpc('vault_read', {
-      secret_id: config.meta_app_secret_id,
-    });
+    // Try Vault first, fallback to direct column
+    let appSecret: string | null = null;
 
-    const appSecret = secretData;
+    if (config.meta_app_secret_id) {
+      try {
+        const { data: secretData } = await adminClient.rpc('vault_read', {
+          secret_id: config.meta_app_secret_id,
+        });
+        appSecret = secretData;
+      } catch {
+        // Vault not available
+      }
+    }
+
+    if (!appSecret && config.meta_app_secret) {
+      appSecret = config.meta_app_secret;
+    }
+
     if (!appSecret) {
-      return new Response(JSON.stringify({ error: 'App Secret nao encontrado no Vault' }), {
-        status: 500,
+      return new Response(JSON.stringify({ error: 'Meta App Secret nao configurado. Salve as credenciais na aba Instagram.' }), {
+        status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
