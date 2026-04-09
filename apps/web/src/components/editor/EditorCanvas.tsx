@@ -8,7 +8,9 @@ const CANVAS_WIDTH = 1080;
 const CANVAS_HEIGHT = 1350;
 
 function ImageElement({ element, commonProps }: { element: EditorElement; commonProps: Record<string, unknown> }) {
-  const [image] = useImage(String(element.attrs.src ?? ''), 'anonymous');
+  const src = String(element.attrs.src ?? '');
+  const isDataUrl = src.startsWith('data:');
+  const [image] = useImage(src, isDataUrl ? undefined : 'anonymous');
   const { src: _src, ...restProps } = commonProps as Record<string, unknown> & { src?: string };
   return <KonvaImage image={image} {...restProps} />;
 }
