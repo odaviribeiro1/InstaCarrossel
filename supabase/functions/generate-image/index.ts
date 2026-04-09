@@ -84,39 +84,61 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Call Gemini Imagen 4 API (Imagen 3 was shut down)
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-        },
-        body: JSON.stringify({
-          instances: [{ prompt }],
-          parameters: {
-            sampleCount: 1,
-            aspectRatio: '3:4',
-          },
-        }),
+    // Try Nano Banana 2 first, fallback to Nano Banana Pro
+    const models = ['gemini-3.1-flash-image-preview', 'gemini-3-pro-image-preview'];
+    let imageBase64 = '';
+    let usedModel = '';
+    let lastError = '';
+
+    for (const model of models) {
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKey,
+            },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                responseModalities: ['TEXT', 'IMAGE'],
+                imageConfig: {
+                  aspectRatio: '3:4',
+                },
+              },
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          const errText = await response.text();
+          lastError = `${model}: ${response.status} - ${errText}`;
+          continue;
+        }
+
+        const data = await response.json();
+
+        // Extract image from response parts
+        const parts = data.candidates?.[0]?.content?.parts || [];
+        for (const part of parts) {
+          if (part.inlineData?.mimeType?.startsWith('image/')) {
+            imageBase64 = part.inlineData.data;
+            usedModel = model;
+            break;
+          }
+        }
+        if (imageBase64) break;
+        lastError = `${model}: no image in response`;
+      } catch (err) {
+        lastError = `${model}: ${String(err)}`;
       }
-    );
-
-    if (!response.ok) {
-      const errText = await response.text();
-      return new Response(
-        JSON.stringify({ error: `Gemini Imagen error (${response.status}): ${errText}` }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
     }
-
-    const data = await response.json();
-    const imageBase64 = data.predictions?.[0]?.bytesBase64Encoded || '';
 
     if (!imageBase64) {
       return new Response(
-        JSON.stringify({ error: 'Nenhuma imagem gerada pelo Imagen.' }),
+        JSON.stringify({ error: `Falha ao gerar imagem. ${lastError}` }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -124,6 +146,7 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         image: `data:image/png;base64,${imageBase64}`,
+        model: usedModel,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
