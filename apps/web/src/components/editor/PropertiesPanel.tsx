@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sparkles, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEditorStore } from '@/stores/editor-store';
@@ -46,11 +46,18 @@ export function PropertiesPanel() {
   const [aiPreview, setAiPreview] = useState<string | null>(null);
   const [aiModel, setAiModel] = useState('');
 
+  // Sync prompt with active slide text when switching slides
+  useEffect(() => {
+    if (activeSlide) {
+      const text = getSlideText(activeSlide.elements);
+      setAiPrompt(text);
+    }
+  }, [activeSlideIndex]);
+
   function openAiDialog() {
-    const text = activeSlide ? getSlideText(activeSlide.elements) : '';
-    setAiPrompt(text);
     setAiPreview(null);
     setAiDialogOpen(true);
+    handleGenerateImage();
   }
 
   async function handleGenerateImage() {
@@ -91,23 +98,41 @@ export function PropertiesPanel() {
 
   const aiButton = (
     <>
-      <div className="border-t mt-3 pt-3">
-        <Button variant="outline" size="sm" className="w-full text-xs" onClick={openAiDialog}>
-          <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-          Gerar com IA
+      <div className="border-t mt-3 pt-3 space-y-2">
+        <label className="text-xs font-medium text-[#94A3B8]">Prompt IA</label>
+        <textarea
+          value={aiPrompt}
+          onChange={(e) => setAiPrompt(e.target.value)}
+          placeholder="Descreva a imagem que deseja gerar..."
+          rows={4}
+          className="flex w-full rounded-md border border-[rgba(59,130,246,0.2)] bg-[#0A0A0F] px-2 py-1.5 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+          disabled={aiGenerating}
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full text-xs"
+          onClick={openAiDialog}
+          disabled={aiGenerating || !aiPrompt.trim()}
+        >
+          {aiGenerating ? (
+            <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />Gerando...</>
+          ) : (
+            <><Sparkles className="mr-1.5 h-3.5 w-3.5" />Gerar com IA</>
+          )}
         </Button>
       </div>
       <Dialog open={aiDialogOpen} onOpenChange={(open) => { setAiDialogOpen(open); if (!open) setAiPreview(null); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Gerar Imagem com IA</DialogTitle>
+            <DialogTitle>Preview da Imagem</DialogTitle>
             <DialogDescription>
-              {aiPreview ? 'Revise a imagem. Aprove para inserir ou altere o prompt.' : 'Edite o texto e use como prompt para gerar a imagem.'}
+              {aiPreview ? 'Revise a imagem gerada. Aprove para inserir no slide ou regenere.' : 'Gerando imagem...'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            {aiPreview && (
-              <div className="space-y-2">
+            {aiPreview ? (
+              <>
                 <div className="overflow-hidden rounded-lg border border-[rgba(59,130,246,0.2)]">
                   <img src={aiPreview} alt="Preview" className="w-full h-auto" />
                 </div>
@@ -116,31 +141,18 @@ export function PropertiesPanel() {
                     Modelo: {aiModel === 'gemini-3.1-flash-image-preview' ? 'Nano Banana 2' : aiModel === 'gemini-3-pro-image-preview' ? 'Nano Banana Pro' : aiModel}
                   </p>
                 )}
-              </div>
-            )}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-[#94A3B8]">Prompt</label>
-              <textarea
-                value={aiPrompt}
-                onChange={(e) => setAiPrompt(e.target.value)}
-                placeholder="Descreva a imagem..."
-                rows={5}
-                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
-                disabled={aiGenerating}
-              />
-            </div>
-            {aiPreview ? (
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setAiPreview(null)} disabled={aiGenerating} className="flex-1">Descartar</Button>
-                <Button variant="outline" onClick={handleGenerateImage} disabled={aiGenerating || !aiPrompt.trim()} className="flex-1">
-                  {aiGenerating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Gerando...</> : <><Sparkles className="mr-2 h-4 w-4" />Regenerar</>}
-                </Button>
-                <Button onClick={handleApproveImage} className="flex-1">Inserir no Slide</Button>
-              </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => { setAiPreview(null); setAiDialogOpen(false); }} className="flex-1">Descartar</Button>
+                  <Button variant="outline" onClick={() => { setAiPreview(null); handleGenerateImage(); }} disabled={aiGenerating} className="flex-1">
+                    <Sparkles className="mr-2 h-4 w-4" />Regenerar
+                  </Button>
+                  <Button onClick={handleApproveImage} className="flex-1">Inserir no Slide</Button>
+                </div>
+              </>
             ) : (
-              <Button onClick={handleGenerateImage} disabled={aiGenerating || !aiPrompt.trim()} className="w-full">
-                {aiGenerating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Gerando...</> : <><Sparkles className="mr-2 h-4 w-4" />Gerar Imagem</>}
-              </Button>
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-[#3B82F6]" />
+              </div>
             )}
           </div>
         </DialogContent>

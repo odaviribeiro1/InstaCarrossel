@@ -148,8 +148,8 @@ export function EditorPage() {
       <div className="flex h-screen flex-col">
         <EditorToolbar />
         <div className="flex flex-1 overflow-hidden">
-          <div className="flex flex-col">
-            <div className="flex-1">
+          <div className="flex flex-col overflow-hidden">
+            <div className="flex-1 overflow-hidden">
               <SlidePanel />
             </div>
             <LayersPanel />
