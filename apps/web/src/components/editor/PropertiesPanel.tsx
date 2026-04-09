@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Sparkles, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useEditorStore, generateElementId } from '@/stores/editor-store';
+import { useEditorStore } from '@/stores/editor-store';
 import type { EditorElement } from '@/stores/editor-store';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,7 +30,7 @@ export function PropertiesPanel() {
     selectedElementId,
     updateElement,
     updateSlideBackground,
-    addElementToBack,
+    replaceSlideWithImage,
   } = useEditorStore();
 
   const { activeWorkspace } = useWorkspaceStore();
@@ -81,25 +81,12 @@ export function PropertiesPanel() {
 
   function handleApproveImage() {
     if (!aiPreview) return;
-    // Save reference before clearing state
     const imageSrc = aiPreview;
-    // Close dialog first, then insert after a tick to avoid React batching issues
     setAiDialogOpen(false);
     setAiPreview(null);
     setAiPrompt('');
-    // Use setTimeout to ensure dialog state is settled before modifying store
-    setTimeout(() => {
-      const element: EditorElement = {
-        id: generateElementId(),
-        type: 'Image',
-        name: 'IA Background',
-        visible: true,
-        locked: false,
-        attrs: { x: 0, y: 0, width: 1080, height: 1350, src: imageSrc, draggable: true },
-      };
-      addElementToBack(element);
-      toast.success('Imagem inserida no slide');
-    }, 100);
+    replaceSlideWithImage(imageSrc);
+    toast.success('Imagem inserida no slide');
   }
 
   const aiButton = (

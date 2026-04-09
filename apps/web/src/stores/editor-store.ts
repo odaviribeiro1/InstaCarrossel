@@ -60,6 +60,7 @@ interface EditorState {
   duplicateSlide: (index: number) => void;
   reorderSlides: (fromIndex: number, toIndex: number) => void;
   updateSlideBackground: (color: string) => void;
+  replaceSlideWithImage: (imageSrc: string) => void;
 
   // History
   pushHistory: () => void;
@@ -278,6 +279,40 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       slides[state.activeSlideIndex] = { ...slide, backgroundColor: color };
       set({ slides, saveStatus: 'unsaved' });
     }
+  },
+
+  replaceSlideWithImage: (imageSrc) => {
+    const state = get();
+    const slide = state.slides[state.activeSlideIndex];
+    if (!slide) return;
+    // Save history
+    const entry: HistoryEntry = {
+      slides: JSON.parse(JSON.stringify(state.slides)),
+      activeSlideIndex: state.activeSlideIndex,
+    };
+    const history = state.history.slice(0, state.historyIndex + 1);
+    history.push(entry);
+    if (history.length > state.maxHistory) history.shift();
+    // Replace slide elements with single full-size image
+    const newSlides = [...state.slides];
+    newSlides[state.activeSlideIndex] = {
+      ...slide,
+      elements: [{
+        id: generateElementId(),
+        type: 'Image' as const,
+        name: 'IA Slide',
+        visible: true,
+        locked: false,
+        attrs: { x: 0, y: 0, width: 1080, height: 1350, src: imageSrc, draggable: false },
+      }],
+    };
+    set({
+      slides: newSlides,
+      selectedElementId: null,
+      history,
+      historyIndex: history.length - 1,
+      saveStatus: 'unsaved',
+    });
   },
 
   pushHistory: () => {
