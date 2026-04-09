@@ -108,15 +108,27 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   addElementToBack: (element) => {
     const state = get();
-    state.pushHistory();
-    const slides = [...state.slides];
-    const slide = slides[state.activeSlideIndex];
-    if (!slide) return;
-    slides[state.activeSlideIndex] = {
+    const slide = state.slides[state.activeSlideIndex];
+    if (!slide) {
+      console.error('addElementToBack: no active slide at index', state.activeSlideIndex);
+      return;
+    }
+    // Skip pushHistory to avoid extra set() call — do everything in one set()
+    const entry: HistoryEntry = {
+      slides: JSON.parse(JSON.stringify(state.slides)),
+      activeSlideIndex: state.activeSlideIndex,
+    };
+    const history = state.history.slice(0, state.historyIndex + 1);
+    history.push(entry);
+    if (history.length > state.maxHistory) history.shift();
+
+    const newSlides = [...state.slides];
+    newSlides[state.activeSlideIndex] = {
       ...slide,
       elements: [element, ...slide.elements],
     };
-    set({ slides, saveStatus: 'unsaved' });
+    console.log('addElementToBack: adding element', element.id, 'to slide', state.activeSlideIndex, 'total elements:', newSlides[state.activeSlideIndex].elements.length);
+    set({ slides: newSlides, history, historyIndex: history.length - 1, saveStatus: 'unsaved' });
   },
 
   updateElement: (id, attrs) => {
