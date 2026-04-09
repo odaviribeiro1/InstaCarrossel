@@ -84,45 +84,39 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Call Gemini Imagen API
-    // Try imagen-3.0-generate-002 first, fallback to imagen-3.0-generate-001
-    const models = ['imagen-3.0-generate-002', 'imagen-3.0-generate-001'];
-    let imageBase64 = '';
-    let lastError = '';
-
-    for (const model of models) {
-      try {
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${apiKey}`;
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            instances: [{ prompt }],
-            parameters: {
-              sampleCount: 1,
-              aspectRatio: '4:5',
-            },
-          }),
-        });
-
-        if (!response.ok) {
-          const errText = await response.text();
-          lastError = `${model}: ${response.status} - ${errText}`;
-          continue;
-        }
-
-        const data = await response.json();
-        imageBase64 = data.predictions?.[0]?.bytesBase64Encoded || '';
-        if (imageBase64) break;
-        lastError = `${model}: nenhuma imagem no response`;
-      } catch (fetchErr) {
-        lastError = `${model}: ${String(fetchErr)}`;
+    // Call Gemini Imagen 4 API (Imagen 3 was shut down)
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
+        body: JSON.stringify({
+          instances: [{ prompt }],
+          parameters: {
+            sampleCount: 1,
+            aspectRatio: '3:4',
+          },
+        }),
       }
+    );
+
+    if (!response.ok) {
+      const errText = await response.text();
+      return new Response(
+        JSON.stringify({ error: `Gemini Imagen error (${response.status}): ${errText}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
+
+    const data = await response.json();
+    const imageBase64 = data.predictions?.[0]?.bytesBase64Encoded || '';
 
     if (!imageBase64) {
       return new Response(
-        JSON.stringify({ error: `Falha ao gerar imagem. ${lastError}` }),
+        JSON.stringify({ error: 'Nenhuma imagem gerada pelo Imagen.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
