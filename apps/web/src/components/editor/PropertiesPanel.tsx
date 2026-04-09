@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { Sparkles, Loader2, Instagram } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEditorStore } from '@/stores/editor-store';
 import type { EditorElement } from '@/stores/editor-store';
@@ -120,6 +120,15 @@ export function PropertiesPanel() {
           ) : (
             <><Sparkles className="mr-1.5 h-3.5 w-3.5" />Gerar com IA</>
           )}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full text-xs"
+          onClick={() => toast.info('Funcionalidade de publicacao em desenvolvimento.')}
+        >
+          <Instagram className="mr-1.5 h-3.5 w-3.5" />
+          Publicar no Instagram
         </Button>
       </div>
       <Dialog open={aiDialogOpen} onOpenChange={(open) => { setAiDialogOpen(open); if (!open) setAiPreview(null); }}>
