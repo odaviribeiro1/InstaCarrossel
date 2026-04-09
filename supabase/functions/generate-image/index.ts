@@ -84,14 +84,14 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Call Gemini Imagen API
+    // Call Gemini Imagen API (Google AI Studio format)
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:generateImages?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          instances: [{ prompt }],
+          instance: { prompt },
           parameters: {
             sampleCount: 1,
             aspectRatio: '4:5',
@@ -102,7 +102,7 @@ Deno.serve(async (req: Request) => {
 
     if (!response.ok) {
       const err = await response.text();
-      throw new Error(`Gemini Imagen error: ${err}`);
+      throw new Error(`Gemini Imagen error (${response.status}): ${err}`);
     }
 
     const data = await response.json();
