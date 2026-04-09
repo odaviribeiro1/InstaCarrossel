@@ -10,6 +10,7 @@ import { PropertiesPanel } from '@/components/editor/PropertiesPanel';
 import { LayersPanel } from '@/components/editor/LayersPanel';
 import { useEditorStore, type EditorSlide } from '@/stores/editor-store';
 import { getSupabaseClient } from '@/lib/supabase';
+import { useWorkspace } from '@/hooks/use-workspace';
 import type { EditorElement } from '@/stores/editor-store';
 
 class EditorErrorBoundary extends React.Component<
@@ -47,6 +48,7 @@ export function EditorPage() {
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const { setCarouselId, setSlides } = useEditorStore();
+  useWorkspace(); // Populate workspace store for toolbar actions
   // Check screen size
   useEffect(() => {
     function checkSize() {
