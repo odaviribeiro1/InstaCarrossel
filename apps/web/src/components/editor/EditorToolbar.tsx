@@ -12,103 +12,25 @@ import {
   ZoomIn,
   ZoomOut,
   Save,
-  Sparkles,
-  Loader2,
 } from 'lucide-react';
-import { useRef, useEffect, useState } from 'react';
-import { toast } from 'sonner';
+import { useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
 import { useEditorStore, generateElementId } from '@/stores/editor-store';
 import type { EditorElement } from '@/stores/editor-store';
 import { useCarouselSave } from '@/hooks/use-carousel-save';
-import { useWorkspaceStore } from '@/stores/workspace-store';
-import { getSupabaseClient } from '@/lib/supabase';
 
 export function EditorToolbar() {
   const {
     addElement,
-    sendToBack,
     zoom,
     setZoom,
     saveStatus,
   } = useEditorStore();
 
   const { save } = useCarouselSave();
-  const { activeWorkspace } = useWorkspaceStore();
 
   const imageObjectUrlRef = useRef<string | null>(null);
-  const [aiDialogOpen, setAiDialogOpen] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [aiGenerating, setAiGenerating] = useState(false);
-  const [aiPreview, setAiPreview] = useState<string | null>(null);
-  const [aiModel, setAiModel] = useState<string>('');
-
-  async function handleGenerateImage() {
-    if (!aiPrompt.trim()) return;
-    const client = getSupabaseClient();
-    if (!client || !activeWorkspace) {
-      toast.error('Workspace nao encontrado. Recarregue a pagina.');
-      return;
-    }
-
-    setAiGenerating(true);
-    setAiPreview(null);
-    try {
-      const { data, error } = await client.functions.invoke('generate-image', {
-        body: { prompt: aiPrompt, workspace_id: activeWorkspace.id },
-      });
-
-      if (error) throw new Error(error.message || 'Erro ao gerar imagem');
-      const result = data as { image?: string; error?: string; model?: string };
-      if (result?.error) throw new Error(result.error);
-      if (!result?.image) throw new Error('Nenhuma imagem retornada');
-
-      setAiPreview(result.image);
-      setAiModel(result.model || '');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Erro ao gerar imagem');
-    } finally {
-      setAiGenerating(false);
-    }
-  }
-
-  function handleApproveImage() {
-    if (!aiPreview) return;
-    const elementId = generateElementId();
-    const element: EditorElement = {
-      id: elementId,
-      type: 'Image',
-      name: 'IA Background',
-      visible: true,
-      locked: false,
-      attrs: {
-        x: 0,
-        y: 0,
-        width: 1080,
-        height: 1350,
-        src: aiPreview,
-        draggable: true,
-      },
-    };
-    addElement(element);
-    sendToBack(elementId);
-    toast.success('Imagem inserida no slide');
-    setAiDialogOpen(false);
-    setAiPreview(null);
-    setAiPrompt('');
-  }
-
-  function handleRejectImage() {
-    setAiPreview(null);
-  }
 
   useEffect(() => {
     return () => {
@@ -220,103 +142,6 @@ export function EditorToolbar() {
         <ImageIcon className="mr-1 h-4 w-4" />
         <span className="text-xs">Imagem</span>
       </Button>
-
-      <Button variant="ghost" size="sm" title="Gerar imagem com IA" onClick={() => setAiDialogOpen(true)}>
-        <Sparkles className="mr-1 h-4 w-4" />
-        <span className="text-xs">Gerar com IA</span>
-      </Button>
-
-      <Dialog open={aiDialogOpen} onOpenChange={(open) => {
-        setAiDialogOpen(open);
-        if (!open) { setAiPreview(null); }
-      }}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Gerar Imagem com IA</DialogTitle>
-            <DialogDescription>
-              {aiPreview
-                ? 'Revise a imagem gerada. Aprove para inserir no slide ou altere o prompt e gere novamente.'
-                : 'Descreva a imagem que deseja gerar para o slide.'}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            {/* Preview */}
-            {aiPreview && (
-              <div className="space-y-2">
-                <div className="relative overflow-hidden rounded-lg border border-[rgba(59,130,246,0.2)]">
-                  <img
-                    src={aiPreview}
-                    alt="Preview da imagem gerada"
-                    className="w-full h-auto"
-                  />
-                </div>
-                {aiModel && (
-                  <p className="text-[10px] text-[#94A3B8] text-center">
-                    Modelo: {aiModel === 'gemini-3.1-flash-image-preview' ? 'Nano Banana 2' : aiModel === 'gemini-3-pro-image-preview' ? 'Nano Banana Pro' : aiModel}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Prompt */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-[#94A3B8]">Prompt</label>
-              <textarea
-                value={aiPrompt}
-                onChange={(e) => setAiPrompt(e.target.value)}
-                placeholder="Ex: Background escuro elegante com gradiente azul e roxo, estilo tech, com formas geometricas abstratas"
-                rows={3}
-                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
-                disabled={aiGenerating}
-              />
-            </div>
-
-            {/* Actions */}
-            {aiPreview ? (
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={handleRejectImage}
-                  disabled={aiGenerating}
-                  className="flex-1"
-                >
-                  Descartar
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleGenerateImage}
-                  disabled={aiGenerating || !aiPrompt.trim()}
-                  className="flex-1"
-                >
-                  {aiGenerating ? (
-                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Gerando...</>
-                  ) : (
-                    <><Sparkles className="mr-2 h-4 w-4" />Regenerar</>
-                  )}
-                </Button>
-                <Button
-                  onClick={handleApproveImage}
-                  className="flex-1"
-                >
-                  Inserir no Slide
-                </Button>
-              </div>
-            ) : (
-              <Button
-                onClick={handleGenerateImage}
-                disabled={aiGenerating || !aiPrompt.trim()}
-                className="w-full"
-              >
-                {aiGenerating ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Gerando...</>
-                ) : (
-                  <><Sparkles className="mr-2 h-4 w-4" />Gerar Imagem</>
-                )}
-              </Button>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Separator orientation="vertical" className="mx-1 h-6" />
 

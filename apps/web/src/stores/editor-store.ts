@@ -45,6 +45,7 @@ interface EditorState {
 
   // Element operations
   addElement: (element: EditorElement) => void;
+  addElementToBack: (element: EditorElement) => void;
   updateElement: (id: string, attrs: Record<string, unknown>) => void;
   removeElement: (id: string) => void;
   reorderElements: (fromIndex: number, toIndex: number) => void;
@@ -103,6 +104,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       elements: [...slide.elements, element],
     };
     set({ slides, selectedElementId: element.id, saveStatus: 'unsaved' });
+  },
+
+  addElementToBack: (element) => {
+    const state = get();
+    state.pushHistory();
+    const slides = [...state.slides];
+    const slide = slides[state.activeSlideIndex];
+    if (!slide) return;
+    slides[state.activeSlideIndex] = {
+      ...slide,
+      elements: [element, ...slide.elements],
+    };
+    set({ slides, saveStatus: 'unsaved' });
   },
 
   updateElement: (id, attrs) => {
