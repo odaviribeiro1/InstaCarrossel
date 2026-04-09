@@ -84,14 +84,14 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Call Gemini Imagen API (Google AI Studio format)
+    // Call Gemini Imagen API (Google AI Studio format — v1beta predict endpoint)
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:generateImages?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          instance: { prompt },
+          instances: [{ prompt }],
           parameters: {
             sampleCount: 1,
             aspectRatio: '4:5',
