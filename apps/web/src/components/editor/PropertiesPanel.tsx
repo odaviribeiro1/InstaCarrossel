@@ -81,19 +81,25 @@ export function PropertiesPanel() {
 
   function handleApproveImage() {
     if (!aiPreview) return;
-    const element: EditorElement = {
-      id: generateElementId(),
-      type: 'Image',
-      name: 'IA Background',
-      visible: true,
-      locked: false,
-      attrs: { x: 0, y: 0, width: 1080, height: 1350, src: aiPreview, draggable: true },
-    };
-    addElementToBack(element);
-    toast.success('Imagem inserida no slide');
+    // Save reference before clearing state
+    const imageSrc = aiPreview;
+    // Close dialog first, then insert after a tick to avoid React batching issues
     setAiDialogOpen(false);
     setAiPreview(null);
     setAiPrompt('');
+    // Use setTimeout to ensure dialog state is settled before modifying store
+    setTimeout(() => {
+      const element: EditorElement = {
+        id: generateElementId(),
+        type: 'Image',
+        name: 'IA Background',
+        visible: true,
+        locked: false,
+        attrs: { x: 0, y: 0, width: 1080, height: 1350, src: imageSrc, draggable: true },
+      };
+      addElementToBack(element);
+      toast.success('Imagem inserida no slide');
+    }, 100);
   }
 
   const aiButton = (
